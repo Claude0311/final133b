@@ -20,7 +20,8 @@ from numpy import arctan2 as atan2, arcsin as asin
 import cupy as cp
 
 from test import distance as cp_distance, update_data
-
+import sys
+sys.setrecursionlimit(10000)
 ######################################################################
 # SECTION 1: DEFINITIONS
 ######################################################################
@@ -32,9 +33,9 @@ scenario = 'move over'
 # scenario = 'narrow park'
 # scenario = 'blank'
 # scenario = 'garage'
-scenario = 'narrow garage'
+# scenario = 'narrow garage'
 scenario = 'load map'
-scenario = 'dual parallel parking'
+# scenario = 'dual parallel parking'
 
 ######################################################################
 #
@@ -978,15 +979,18 @@ def main():
 
     disp_metrics(path,plan_time,tree_size)
 
+    plt.savefig('0.png')
+
     while True:
-        visual.drawPath(path, color='r', linewidth=2)
+        # visual.drawPath(path, color='r', linewidth=2)
+        # visual.show("Showing the Raw PATH", delay=0)
+        # q = input()
+        # if q=='q': break
+        # if q=='p':
+        visual.drawPath(path, show_track=True, color='r', linewidth=2)
         visual.show("Showing the Raw PATH", delay=0)
-        q = input()
-        if q=='q': break
-        if q=='p':
-            visual.drawPath(path, show_track=True, color='r', linewidth=2)
-            visual.show("Showing the Raw PATH")
-            break
+        plt.savefig('1.png')
+        break
 
 
     post1 = time.time()
@@ -1002,14 +1006,15 @@ def main():
     disp_metrics(smooth_path,plan_time,tree_size,smooth_time)
 
     while True:
-        visual.drawPath(smooth_path, color='b', linewidth=2)
+        # visual.drawPath(smooth_path, color='b', linewidth=2)
+        # visual.show("Showing the Smoothed PATH", delay=0)
+        # q = input()
+        # if q=='q': break
+        # if q=='p':
+        visual.drawPath(smooth_path, show_track=True, color='b', linewidth=2)
         visual.show("Showing the Smoothed PATH", delay=0)
-        q = input()
-        if q=='q': break
-        if q=='p':
-            visual.drawPath(smooth_path, show_track=True, color='b', linewidth=2)
-            visual.show("Showing the Smoothed PATH")
-            break
+        plt.savefig('2.png')
+        break
         
 
 if __name__== "__main__":

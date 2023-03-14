@@ -20,29 +20,21 @@ from numpy import arctan2 as atan2, arcsin as asin
 import cupy as cp
 
 from test import distance as cp_distance, update_data
+from scipy.spatial import KDTree
 
-import sys
-sys.setrecursionlimit(10000)
 ######################################################################
 # SECTION 1: DEFINITIONS
 ######################################################################
 
-######################################################################
-#
-#   Scenario.  We consider three cases: parallel parking, u turns, and
-#   moving the car sideways.
-#
-#   TODO: Adjust as needed for later problems.
 #
 # scenario = 'parallel parking'
-# scenario = 'u turn'
+scenario = 'u turn'
 # scenario = 'move over'
-scenario = 'narrow park'
+# scenario = 'narrow park'
 # scenario = 'blank'
-scenario = 'garage'
+# scenario = 'garage'
 # scenario = 'narrow garage'
-scenario = 'load map'
-# scenario = 'dual parallel parking'
+# scenario = 'load map'
 
 ######################################################################
 #
@@ -59,9 +51,6 @@ lb           = 0.5              # Center of rotation to back bumper
 lf           = lcar - lb        # Center of rotation to front bumper
 wc           = wcar/2           # Center of rotation to left/right
 wheelbase    = 3                # Center of rotation to front wheels
-
-trailer_l, trailer_w = (2,2)
-trailer_distance = 3            # Center of trailer to center of car
 
 PHIMAX = np.pi / 6
 DPHI = PHIMAX / 3
@@ -85,10 +74,10 @@ if scenario == 'parallel parking':
 
     # General numbers.
     (wroad)                  = 6                # Road width
-    (xspace, lspace, wspace) = (4, 10, 2.5)      # Parking Space pos/len/width
+    (xspace, lspace, wspace) = (3, 6, 2.5)      # Parking Space pos/len/width
 
     # Overall size.
-    (xmin, xmax) = (0, 18)
+    (xmin, xmax) = (0, 14)
     (ymin, ymax) = (0, wroad+wspace)
 
     # Construct the walls.
@@ -102,14 +91,14 @@ if scenario == 'parallel parking':
              ((xmin         , wroad       ), (xmin         , ymin        )))
 
     # Pick your start and goal locations.
-    (startx, starty, starttheta) = (6.0, 4.0, 0.0)
-    (goalx,  goaly,  goaltheta)  = (2+xspace+(lspace-lcar)/2+lb, wroad+wc, 0.0)
+    (startx, starty, starttheta) = (1.0, 4.0, 0.0)
+    (goalx,  goaly,  goaltheta)  = (xspace+(lspace-lcar)/2+lb, wroad+wc, 0.0)
 
 ### U Turn (3 point turn).
 elif scenario == 'u turn':
 
     # General numbers.
-    (xroad, yroad, wlane) = (7.5, 10, 3)  # road len, pos, lane width
+    (xroad, yroad, wlane) = (5, 10, 3)  # road len, pos, lane width
 
     # Overall size.
     (xmin, xmax) = (0, 22)
@@ -126,7 +115,7 @@ elif scenario == 'u turn':
              ((xmin,  yroad + wlane), (xmin,  yroad - wlane)))
 
     # Pick your start and goal locations.
-    (startx, starty, starttheta) = (4.5, yroad - 1.5, 0)
+    (startx, starty, starttheta) = (1.0, yroad - 1.5, 0)
     (goalx,  goaly,  goaltheta)  = (4.0, yroad + 1.5, pi)
 
 ### Shift over
@@ -255,8 +244,8 @@ elif scenario=='blank':
 
     (startx, starty, starttheta) = ranpos() #(25, 5, 0.5*pi) # 
     (goalx,  goaly,  goaltheta)  = ranpos() #(5,  25, 0.5*pi) # 
-    (startx, starty, starttheta) = (20, 5, 1.0*pi) # 
-    (goalx,  goaly,  goaltheta)  = (10,  25, 0.5*pi) # 
+    # (startx, starty, starttheta) = (25, 5, 0.5*pi) # 
+    # (goalx,  goaly,  goaltheta)  = (5,  25, 0.5*pi) # 
 
 elif scenario=='load map':
     (xmin, xmax) = (0, 30)
@@ -268,30 +257,12 @@ elif scenario=='load map':
             ((xmin, ymax), (xmin, ymin)),
             ]
 
-    f = np.load('map2_trailer.npy')
+    f = np.load('map2.npy')
     for [[x0,y0],[x1,y1]] in  f:
         walls.append(((x0/20,ymax-y0/20),(x1/20,ymax-y1/20)))
     
     (startx, starty, starttheta) = ( 7, 7, 0.25*pi)
     (goalx,  goaly,  goaltheta)  = (25,  22, 0.5*pi)
-    (interx, intery, intertheta) = (10, 23.5, 0.0*pi)
-
-elif scenario=='dual parallel parking':
-    (xmin, xmax) = (0, 30)
-    (ymin, ymax) = (0, 30)
-
-    walls = [((xmin, ymin), (xmax, ymin)),
-            ((xmax, ymin), (xmax, ymax)),
-            ((xmax, ymax), (xmin, ymax)),
-            ((xmin, ymax), (xmin, ymin)),
-            ]
-
-    f = np.load('map3_trailer.npy')
-    for [[x0,y0],[x1,y1]] in  f:
-        walls.append(((x0/20,ymax-y0/20),(x1/20,ymax-y1/20)))
-    
-    (startx, starty, starttheta) = ( 6, 12, 0.0*pi)
-    (goalx,  goaly,  goaltheta)  = (20,  12, 0.0*pi)
 
 
 elif scenario=='narrow park':
@@ -319,7 +290,7 @@ elif scenario=='narrow park':
 
     walls.extend(walls_extend)
     
-    (startx, starty, starttheta) = ( 5, 27.5, 0)
+    (startx, starty, starttheta) = ( 1, 27.5, 0)
     (goalx,  goaly,  goaltheta)  = (5, 1.5 , pi)
 
 ### Unknown.
@@ -346,7 +317,7 @@ else:
 cstep    =   1
 csteer   =  0
 creverse = 0
-dt = 1
+dt = 0.1
 
 if scenario == 'parallel parking':
     dstep      = 0.4            # Distrance driven per move
@@ -381,9 +352,7 @@ elif scenario == 'load map':
     thetastep = pi/36
 
 else:
-    dstep      = 0.4            # Distrance driven per move
-    thetastep = pi/36
-    # raise ValueError("Unknown Scenario")
+    raise ValueError("Unknown Scenario")
 
 
 def wrap360(theta):
@@ -404,29 +373,23 @@ def wrap180(theta):
 # Initialize the counters (for diagnostics only)
 nodecounter = 0
 donecounter = 0
+nodecount = True
 
 # Make sure thetastep is an integer fraction of 2pi, so the grid wraps nicely.
 #thetastep = dstep * tan(steerangle) / wheelbase
 thetastep  = 2*pi / round(2*pi/thetastep)
 steerangle = np.arctan(wheelbase * thetastep / dstep)
 
-nodecount = True
-
 # Node Class
 class Node:
-    def __init__(self, x, y, theta, theta1=None):
+    def __init__(self, x, y, theta):
         # Setup the basic A* node.
         super().__init__()
 
         # Remember the state (x,y,theta).
-        if theta1 is None: theta1 = theta
-        # theta1 = theta
         self.x     = x
         self.y     = y
         self.theta = theta
-        self.theta1 = theta1
-        self.theta2 = theta1-theta
-
 
         # Precompute/save the trigonometry
         self.s = np.sin(theta)
@@ -443,18 +406,6 @@ class Node:
                     (x - self.c*lb - self.s*wc, y - self.s*lb + self.c*wc),
                     (x - self.c*lb + self.s*wc, y - self.s*lb - self.c*wc),
                     (x + self.c*lf + self.s*wc, y + self.s*lf - self.c*wc))
-        
-        theta_trailer = theta1+pi
-        s_tr = sin(theta_trailer)
-        c_tr = cos(theta_trailer)
-        x_trailer, y_trailer = (x + trailer_distance * cos(theta_trailer), y +  trailer_distance * sin(theta_trailer))
-        self.x_trailer, self.y_trailer = x_trailer, y_trailer
-        self.box2 = (
-            (x_trailer + c_tr*0.5*trailer_l - s_tr*0.5*trailer_w, y_trailer + s_tr*0.5*trailer_l + c_tr*0.5*trailer_w),
-            (x_trailer - c_tr*0.5*trailer_l - s_tr*0.5*trailer_w, y_trailer - s_tr*0.5*trailer_l + c_tr*0.5*trailer_w),
-            (x_trailer - c_tr*0.5*trailer_l + s_tr*0.5*trailer_w, y_trailer - s_tr*0.5*trailer_l - c_tr*0.5*trailer_w),
-            (x_trailer + c_tr*0.5*trailer_l + s_tr*0.5*trailer_w, y_trailer + s_tr*0.5*trailer_l - c_tr*0.5*trailer_w)
-        )
 
         # Tree connectivity.  Define how we got here (set defaults for now).
         self.parent  = None
@@ -526,14 +477,14 @@ class Node:
                     wheelbase**2 * (self.s - other.s)**2 + wheelbase**2 * (self.c - other.c)**2)
     
     def goal_distance(self, other):
-        return sqrt((self.x - other.x)**2 + (self.y - other.y)**2 + wheelbase * ((self.s - other.s)**2 + (self.c - other.c)**2) + trailer_distance*2 * ((sin(self.theta2)-sin(other.theta2))**2 + (cos(self.theta2)-cos(other.theta2))**2))
+        return sqrt((self.x - other.x)**2 + (self.y - other.y)**2 + wheelbase * ((self.s - other.s)**2 + (self.c - other.c)**2))
 
     ############
     # Utilities:
     # In case we want to print the node.
     def __repr__(self):
-        return ("<XY %5.2f,%5.2f @ %5.1f deg, %5.1f deg> (fwd %2d, str %5.1f deg)" %
-                (self.x, self.y, np.degrees(self.theta), np.degrees(self.theta2),
+        return ("<XY %5.2f,%5.2f @ %5.1f deg> (fwd %2d, str %5.1f deg)" %
+                (self.x, self.y, np.degrees(self.theta),
                  self.forward, np.degrees(self.steer)))
     
     # Define the "less-than" to enable sorting by cost!
@@ -546,6 +497,9 @@ class Node:
         return (round((self.x - xmin)/dstep),
                 round((self.y - ymin)/dstep),
                 round(self.theta/thetastep) % round(2*pi/thetastep))
+    
+    def coordinates(self):
+        return (self.x, self.y, self.s, self.c)
 
 
     #####################
@@ -573,6 +527,7 @@ class Node:
         child.forward = forward
         child.steer   = steer
 
+
         child.cost = self.cost + cstep
         if self.forward!=child.forward: child.cost += creverse
         if self.steer != child.steer: child.cost += csteer
@@ -586,10 +541,8 @@ class Node:
     # Check whether in free space.
     def inFreespace(self):
         for wall in walls:
-            if SegmentCrossBox(wall, self.box) or SegmentCrossBox(wall, self.box2):
+            if SegmentCrossBox(wall, self.box):
                 return False
-        for index in range(4):
-            if SegmentCrossBox((self.box2[index-1], self.box2[index]), self.box): return False
         return True
 
     # Check the local planner - whether this connects to another node.
@@ -601,6 +554,14 @@ class Node:
                 SegmentCrossSegment(wall, (self.box[3], other.box[3]))):
                 return False
         return True
+    
+    def cost_short(self, other):
+        if abs(self.steer)>1e-4:
+            path_length = abs((wheelbase/np.tan(self.steer))*(other.theta - self.theta))
+        else:
+            path_length = np.sqrt((self.x-other.x)**2 + (self.y-other.y)**2)
+
+        return path_length
 
 
 ######################################################################
@@ -648,26 +609,18 @@ class Visualization:
 
     def drawNode(self, node, *args, **kwargs):
         b = node.box
-        b2 = node.box2
         tmp_plot = []
         # Box
         tmp_plot.append(plt.plot((b[0][0], b[1][0]), (b[0][1], b[1][1]), *args, **kwargs))
         tmp_plot.append(plt.plot((b[1][0], b[2][0]), (b[1][1], b[2][1]), *args, **kwargs))
         tmp_plot.append(plt.plot((b[2][0], b[3][0]), (b[2][1], b[3][1]), *args, **kwargs))
         tmp_plot.append(plt.plot((b[3][0], b[0][0]), (b[3][1], b[0][1]), *args, **kwargs))
-        tmp_plot.append(plt.plot((b2[0][0], b2[1][0]), (b2[0][1], b2[1][1]), *args, **kwargs))
-        tmp_plot.append(plt.plot((b2[1][0], b2[2][0]), (b2[1][1], b2[2][1]), *args, **kwargs))
-        tmp_plot.append(plt.plot((b2[2][0], b2[3][0]), (b2[2][1], b2[3][1]), *args, **kwargs))
-        tmp_plot.append(plt.plot((b2[3][0], b2[0][0]), (b2[3][1], b2[0][1]), *args, **kwargs))
         # Headlights
         tmp_plot.append(plt.plot(0.9*b[3][0]+0.1*b[0][0], 0.9*b[3][1]+0.1*b[0][1],
                  *args, **kwargs, marker='o'))
         tmp_plot.append(plt.plot(0.1*b[3][0]+0.9*b[0][0], 0.1*b[3][1]+0.9*b[0][1],
                  *args, **kwargs, marker='o'))
-        tmp_plot.append(plt.plot(
-            (node.x, node.x_trailer), (node.y, node.y_trailer),
-            *args, **kwargs
-        ))
+        
         # for s in [0,1]:
         #     tmp_plot.append(plt.plot(node.rc[s][0], node.rc[s][1], 
         #             *args, **kwargs, marker='o'))
@@ -676,15 +629,9 @@ class Visualization:
         for head in [0.125, 0.875]:
             for left in [0.1, 0.9]:
                 theta = node.theta
-                theta1 = node.theta1
                 x = head * (left * b[3][0]+ (1-left) * b[0][0]) + (1-head) * (left * b[2][0]+ (1-left) * b[1][0])
                 y = head * (left * b[3][1]+ (1-left) * b[0][1]) + (1-head) * (left * b[2][1]+ (1-left) * b[1][1])
                 if head==0.875: 
-                    # draw trailer's wheel
-                    x_trailer = head * (left * b2[3][0]+ (1-left) * b2[0][0]) + (1-head) * (left * b2[2][0]+ (1-left) * b2[1][0])
-                    y_trailer = head * (left * b2[3][1]+ (1-left) * b2[0][1]) + (1-head) * (left * b2[2][1]+ (1-left) * b2[1][1])
-                    tmp_plot.append(plt.plot( (x_trailer + 0.25*cos(theta1), x_trailer - 0.25*cos(theta1)), (y_trailer + 0.25*sin(theta1), y_trailer - 0.25*sin(theta1)), 
-                                        *args, **kwargs))
                     theta += node.steer
                 tmp_plot.append(plt.plot( (x + 0.25*cos(theta), x - 0.25*cos(theta)), (y + 0.25*sin(theta), y - 0.25*sin(theta)), 
                                         *args, **kwargs))
@@ -707,26 +654,44 @@ class Visualization:
 #   goal by bias
 #
 TOLERANCE_SAMPLE = wheelbase/2
-TOLERANCE_TOGOAL = 0.5
+TOLERANCE_TOGOAL = 1
 Nmax  = float('inf')
 
-def get_target(goalnode):
+def get_target(goalnode, r):
     p = random.uniform(0,1)
     p_eva = 0.5
     if p<0.05:
         targetnode = goalnode
+    elif p<p_eva and r<float('inf'):
+        x = goalnode.x
+        y = goalnode.y
+        theta = goalnode.theta
+        dx = random.gauss(0,r/3)
+        dy = random.gauss(0,r/3)
+        dtheta = random.gauss(0,r/3/wheelbase)
+        targetnode = Node( x+dx, y+dy, theta+dtheta )
+        # while True:
+        #     dx = random.gauss(0,r/3)
+        #     dy = random.gauss(0,r/3)
+        #     dtheta = random.gauss(0,r/3/wheelbase)
+        #     targetnode = Node( x+dx, y+dy, theta+dtheta )
+        #     if targetnode.inFreespace():break
+        # if targetnode.distance(goalnode)<TOLERANCE_SAMPLE:
+        #     targetnode = goalnode
     else:
         targetnode = Node( 
                 random.uniform(xmin, xmax),
                 random.uniform(ymin, ymax),
                 random.uniform(-np.pi, np.pi)
         )
-    # targetnode = Node( 
-    #             random.uniform(xmin, xmax),
-    #             random.uniform(ymin, ymax),
-    #             random.uniform(-np.pi, np.pi)
-    #     )
-    return targetnode
+        # while True:
+        #     targetnode = Node( 
+        #         random.uniform(xmin, xmax),
+        #         random.uniform(ymin, ymax),
+        #         random.uniform(-np.pi, np.pi)
+        #     )
+        #     if targetnode.inFreespace(): break
+    return targetnode, p<p_eva
 
 ######################################################################
 #
@@ -741,7 +706,6 @@ def omp_input_coldet( nearnode, targetnode):
     theta = nearnode.theta
     x_now = nearnode.x
     y_now = nearnode.y
-    theta1_now = nearnode.theta1
 
     s_opt = 0
     phi_opt = 0
@@ -754,11 +718,10 @@ def omp_input_coldet( nearnode, targetnode):
             xn = x_now + s * dt * cos(theta)
             yn = y_now + s * dt * sin(theta)
             theta_n = theta + s * tan(tmp_phi)/wheelbase * dt
-            theta1_n = theta1_now + s/trailer_distance * sin(theta-theta1_now)
             if tmp_phi == nearnode.steer and s == -nearnode.forward: # skip the case that return to near
                 tmp_phi += DPHI
                 continue
-            pre_next_node = Node(xn, yn, theta_n, theta1_n)
+            pre_next_node = Node(xn, yn, theta_n)
             if pre_next_node.inFreespace():
                 tmp_d = pre_next_node.distance(targetnode)
                 if distance_min>tmp_d:
@@ -772,7 +735,10 @@ def omp_input_coldet( nearnode, targetnode):
     opt_node.steer = phi_opt
     opt_node.forward = s_opt
 
+    opt_node.cost += nearnode.cost + opt_node.cost_short(nearnode)
+
     return opt_node
+
 
 
 ######################################################################
@@ -785,7 +751,6 @@ def rrt(startnode, goalnode, visual):
     # Start the tree with the startnode (set no parent just in case).
     startnode.parent = None
     tree = [startnode]
-    tree2 = [goalnode]
 
     # Function to attach a new node to an existing node: attach the
     # parent, add to the tree, and show in the figure.
@@ -794,138 +759,105 @@ def rrt(startnode, goalnode, visual):
         tree.append(newnode)
         visual.drawEdge(oldnode, newnode, color='g', linewidth=1)
         visual.show()
-    
-    def addtotree2(oldnode, newnode):
-        newnode.parent = oldnode
-        tree2.append(newnode)
-        visual.drawEdge(oldnode, newnode, color='orange', linewidth=1)
-        visual.show()
 
     # Loop - keep growing the tree.
     r = float('inf')
     tmp_min = float('inf')
 
     datas = cp.zeros((10000000,7))
-    data2 = cp.zeros((10000000,7))
     update_data(datas, 0, startnode)
-    update_data(data2, 0, goalnode)
-
-    swap = True
 
     while True:
         # Determine the target state.
-        if swap:
-            ##########################################################################
-            targetnode = get_target(tree2[0])
+        targetnode, goal_flag = get_target(goalnode, r)
 
-            # Directly determine the distances to the target node.
-            if True:#len(tree)>10000:
-                index = cp_distance(datas[:len(tree),], targetnode)
-            else:
-                distances = np.array([node.distance(targetnode) for node in tree])
-                index     = np.argmin(distances)
-            nearnode  = tree[index]
+        # visual.drawPath([targetnode], color='r', linewidth=2)
 
-            # Determine the next node.
-            nextnode1 = omp_input_coldet(nearnode, targetnode)
-            
-            if nextnode1 is None: continue
-            update_data(datas, len(tree), nextnode1)
-
-            # Check whether to attach.
-            addtotree(nearnode, nextnode1)
-            ##########################################################################
-            targetnode = nextnode1
-
-            # Directly determine the distances to the target node.
-            if True:#len(tree)>10000:
-                index = cp_distance(data2[:len(tree2),], targetnode)
-            else:
-                distances = np.array([node.distance(targetnode) for node in tree])
-                index     = np.argmin(distances)
-            nearnode  = tree2[index]
-
-            # Determine the next node.
-            nextnode2 = omp_input_coldet(nearnode, targetnode)
-            
-            if nextnode2 is None: continue
-            update_data(data2, len(tree2), nextnode2)
-
-            # Check whether to attach.
-            addtotree2(nearnode, nextnode2)
-
-            swap = not swap
+        # Directly determine the distances to the target node.
+        if True:#len(tree)>10000:
+            index = cp_distance(datas[:len(tree),], targetnode)
         else:
-            ##########################################################################
-            targetnode = get_target(tree[0])
+            distances = np.array([node.distance(targetnode) for node in tree])
+            index     = np.argmin(distances)
+        nearnode  = tree[index]
+        # d         = distances[index]
+        tmp_cost = np.array([node.cost for node in tree])
+        # X = np.array([node.coordinates() for node in tree])
+        # kdtree  = KDTree(X)
+        # nearnodes = kdtree.query_ball_point(X, r=1.5*dstep, return_length=False)[index]
+        
 
-            # Directly determine the distances to the target node.
-            if True:#len(tree)>10000:
-                index = cp_distance(data2[:len(tree2),], targetnode)
-            else:
-                distances = np.array([node.distance(targetnode) for node in tree])
-                index     = np.argmin(distances)
-            nearnode  = tree2[index]
+        # end_time = time.perf_counter()
+        # execution_time = end_time - start_time
+        # print(f"performance of finding min  is: {execution_time}")
 
-            # Determine the next node.
-            nextnode2 = omp_input_coldet(nearnode, targetnode)
-            
-            if nextnode2 is None: continue
-            update_data(data2, len(tree2), nextnode2)
+        # Determine the next node.
+        # TODO:
+        # norm = nearnode.distance(targetnode)
+        # start_time = time.perf_counter()
+        nextnode = omp_input_coldet( nearnode, targetnode)
+        # visual.drawPath([nextnode], color='r', linewidth=2)
+        # end_time = time.perf_counter()
+        # execution_time = end_time - start_time
+        # print(f"performance of finding next is: {execution_time}")
+        if nextnode is None: continue
+        update_data(datas, len(tree), nextnode)
 
-            # Check whether to attach.
-            addtotree2(nearnode, nextnode2)
+        X = np.array([node.goal_distance(nearnode) for node in tree])
+        nearnodes = np.array(range(len(tree)))[X<1.5*dstep]
 
-            ##########################################################################
-            targetnode = nextnode2
+        min_node = nearnode
+        min_cos = nearnode.cost + nearnode.distance(nextnode)
+        for tmp_ind in nearnodes:
+            tmp_node = tree[tmp_ind]
+            if tmp_node.cost + tmp_node.distance(nextnode)< min_cos:
+                # print('change min_code')
+                min_node = tmp_node
+                min_cos = tmp_node.cost + tmp_node.distance(nextnode)
+        nearnode = min_node
+        for tmp_ind in nearnodes:
+            tmp_node = tree[tmp_ind]
+            if nextnode.cost + nextnode.distance(tmp_node)<tmp_node.cost:
+                # print('rewiring')
+                tmp_node.parent = nextnode
+                tmp_node.cost = nextnode.cost + nextnode.distance(tmp_node)
 
-            # Directly determine the distances to the target node.
-            if True:#len(tree)>10000:
-                index = cp_distance(datas[:len(tree),], targetnode)
-            else:
-                distances = np.array([node.distance(targetnode) for node in tree])
-                index     = np.argmin(distances)
-            nearnode  = tree[index]
 
-            # Determine the next node.
-            nextnode1 = omp_input_coldet(nearnode, targetnode)
-            
-            if nextnode1 is None: continue
-            update_data(datas, len(tree), nextnode1)
 
-            # Check whether to attach.
-            addtotree(nearnode, nextnode1)
-            ##########################################################################
-            swap = not swap
 
-            # If within dstep, also try connecting to the goal.  If
-            # the connection is made, break the loop to stop growing.
-            # TODO:
-        d_next_to_goal = nextnode1.goal_distance(nextnode2)
+        # nextnode = nearnode.intermediate(targetnode, dstep/d)
 
-        if d_next_to_goal < TOLERANCE_TOGOAL: # and nextnode.connectsTo(goalnode):
+        # Check whether to attach.
+        # if nextnode.inFreespace() and nearnode.connectsTo(nextnode):
+        addtotree(nearnode, nextnode)
+        # visual.drawPath([nextnode], color='r', linewidth=2)
+
+        # If within dstep, also try connecting to the goal.  If
+        # the connection is made, break the loop to stop growing.
+        # TODO:
+        d_next_to_goal = nextnode.distance(goalnode)
+        if goal_flag: r = d_next_to_goal * K_RATIO_OF_R_N_D
+        if tmp_min>nextnode.goal_distance(goalnode):
+            tmp_min = nextnode.goal_distance(goalnode)
+            # print(tmp_min)
+
+        if nextnode.goal_distance(goalnode) < TOLERANCE_TOGOAL: # and nextnode.connectsTo(goalnode):
             # addtotree(nextnode, goalnode)
             break
 
         # Check whether we should abort (tree has gotten too large).
-        if (len(tree) >= Nmax) or (len(tree2) >= Nmax):
-            return (None, len(tree) + len(tree2))
+        if (len(tree) >= Nmax):
+            return (None, len(tree))
 
     # Build and return the path.
-    path1 = [nextnode1]
-    path2 = [nextnode2]
-    while path1[0].parent is not None:
-        path1.insert(0, path1[0].parent)
-
-    while path2[-1].parent is not None:
-        path2.append(path2[-1].parent)
-    
-    path1.extend(path2)
-    return path1, len(tree) + len(tree2)
+    path = [nextnode]
+    while path[0].parent is not None:
+        path.insert(0, path[0].parent)
+    return path, len(tree)
 
 
 def PostProcess_smooth(path):
-    if len(path)<=2: return path
+    if len(path)==1: return path
     new_path = [path[0]]
     while len(new_path)<len(path):
         nextnode = omp_input_coldet(new_path[-1],path[-1])
@@ -980,6 +912,10 @@ def disp_metrics(path,plan_time,tree_size,smooth_time=None):
 
 
 
+
+
+
+
 ######################################################################
 #
 #   Main Code
@@ -990,7 +926,7 @@ def main():
 
 
     print("-"*50)
-    print("RRT based Planner for Non-Holonomic Mobile Robots (Car+Trailer)")
+    print("RRT based Planner for Non-Holonomic Mobile Robots (Car)")
     print("-"*50)
 
 
@@ -1021,46 +957,45 @@ def main():
 
     plan_time = round(time.time() - start_time,2)
 
+
     # Print/Show the path.
     print("PATH found after sampling %d nodes" % nodecounter)
 
     disp_metrics(path,plan_time,tree_size)
-    plt.savefig('0.png')
+
     while True:
-        # visual.drawPath(path, color='r', linewidth=2)
-        # visual.show("Showing the Raw PATH", delay=0)
-        # q = input()
-        # if q=='q': break
-        # if q=='p':
-        visual.drawPath(path, show_track=True, color='r', linewidth=2)
+        visual.drawPath(path, color='r', linewidth=2)
         visual.show("Showing the Raw PATH", delay=0)
-        plt.savefig('1.png')
-        break
+        q = input()
+        if q=='q': break
+        if q=='p':
+            visual.drawPath(path, show_track=True, color='r', linewidth=2)
+            visual.show("Showing the Raw PATH")
+            break
+
 
     post1 = time.time()
+    
 
     global nodecount
     nodecount = False
     smooth_path = PostProcess_smooth(path)
 
-
     smooth_time = round(time.time() - post1,2)
+
 
     disp_metrics(smooth_path,plan_time,tree_size,smooth_time)
 
     while True:
-        # visual.drawPath(smooth_path, color='b', linewidth=2)
-        # visual.show("Showing the Smoothed PATH", delay=0)
-        # q = input()
-        # if q=='q': break
-        # if q=='p':
-        visual.drawPath(smooth_path, show_track=True, color='b', linewidth=2)
+        visual.drawPath(smooth_path, color='b', linewidth=2)
         visual.show("Showing the Smoothed PATH", delay=0)
-        plt.savefig('2.png')
-        break
-
-
-    
+        q = input()
+        if q=='q': break
+        if q=='p':
+            visual.drawPath(smooth_path, show_track=True, color='b', linewidth=2)
+            visual.show("Showing the Smoothed PATH")
+            break
+        
 
 if __name__== "__main__":
     main()
