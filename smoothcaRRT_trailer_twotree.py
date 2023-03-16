@@ -10,6 +10,8 @@ import numpy as np
 import random
 import time
 from scipy.optimize import fsolve, least_squares
+import sys
+sys.setrecursionlimit(500000)
 
 from copy import deepcopy
 import time
